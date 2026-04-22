@@ -1,102 +1,153 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
+const ACCENT = '#2563EB';
+
 export default function OnboardingScreen({ navigation }: Props) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.hat}>🎩</Text>
-      <Text style={styles.title}>Sorting Hat</Text>
-      <Text style={styles.tagline}>Speak your tasks.{'\n'}We handle the rest.</Text>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.content}>
+        <Text style={styles.hat}>🎩</Text>
+        <Text style={styles.title}>Sorting Hat</Text>
+        <Text style={styles.tagline}>
+          Speak your tasks. We handle the rest.
+        </Text>
 
-      <View style={styles.features}>
-        <FeatureRow icon="🎙️" text="Record tasks by voice in seconds" />
-        <FeatureRow icon="🤖" text="AI scores and prioritises for you" />
-        <FeatureRow icon="⚡" text="Always know what to tackle next" />
+        <View style={styles.infoList}>
+          <InfoLine
+            icon="mic-outline"
+            title="Capture tasks by voice"
+            body="Just talk — no typing, no forms, no friction."
+          />
+          <InfoLine
+            icon="sparkles-outline"
+            title="AI understands context"
+            body="Each task is sorted and scored automatically."
+          />
+          <InfoLine
+            icon="flash-outline"
+            title="Always know what matters"
+            body="Your top priorities surface at the top of the list."
+          />
+        </View>
       </View>
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.replace('Home')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.buttonText}>Get Started</Text>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.replace('ConnectAccounts')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.buttonText}>Get Started</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// ─── InfoLine ─────────────────────────────────────────────────────────────────
+
+interface InfoLineProps {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  body: string;
+}
+
+function InfoLine({ icon, title, body }: InfoLineProps) {
+  return (
+    <View style={styles.infoRow}>
+      <Ionicons name={icon} size={22} color={ACCENT} style={styles.infoIcon} />
+      <View style={styles.infoText}>
+        <Text style={styles.infoTitle}>{title}</Text>
+        <Text style={styles.infoBody}>{body}</Text>
+      </View>
     </View>
   );
 }
 
-function FeatureRow({ icon, text }: { icon: string; text: string }) {
-  return (
-    <View style={styles.featureRow}>
-      <Text style={styles.featureIcon}>{icon}</Text>
-      <Text style={styles.featureText}>{text}</Text>
-    </View>
-  );
-}
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#0f0f1a',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'space-between',
+  },
+  content: {
     paddingHorizontal: 32,
-    gap: 8,
+    paddingTop: 40,
+    alignItems: 'center',
   },
   hat: {
-    fontSize: 72,
-    marginBottom: 8,
+    fontSize: 64,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: '800',
-    color: '#f5c842',
-    letterSpacing: 1,
+    color: '#0F172A',
+    letterSpacing: 0.3,
   },
   tagline: {
-    fontSize: 18,
-    color: '#c0c0d8',
+    fontSize: 16,
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 28,
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: 10,
+    lineHeight: 24,
   },
-  features: {
-    width: '100%',
-    gap: 16,
-    marginBottom: 40,
+  infoList: {
+    marginTop: 48,
+    gap: 28,
+    alignSelf: 'stretch',
   },
-  featureRow: {
+  infoRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#1c1c2e',
-    borderRadius: 12,
-    padding: 14,
+    alignItems: 'flex-start',
+    gap: 14,
+    paddingHorizontal: 4,
   },
-  featureIcon: {
-    fontSize: 24,
+  infoIcon: {
+    marginTop: 2,
   },
-  featureText: {
-    fontSize: 15,
-    color: '#c0c0d8',
+  infoText: {
     flex: 1,
+    gap: 4,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  infoBody: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+
+  footer: {
+    paddingHorizontal: 28,
+    paddingBottom: 28,
   },
   button: {
-    backgroundColor: '#f5c842',
+    backgroundColor: ACCENT,
     borderRadius: 14,
     paddingVertical: 16,
-    paddingHorizontal: 48,
-    width: '100%',
     alignItems: 'center',
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
   buttonText: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0f0f1a',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });

@@ -8,6 +8,7 @@ import {
 import HomeScreen from '../screens/HomeScreen';
 import RecordScreen from '../screens/RecordScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import ConnectAccountsScreen from '../screens/ConnectAccountsScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 
 /**
@@ -16,6 +17,7 @@ import TaskDetailScreen from '../screens/TaskDetailScreen';
  */
 export type RootStackParamList = {
   Onboarding: undefined;
+  ConnectAccounts: undefined;
   Home: undefined;
   Record: undefined;
   TaskDetail: { taskId: string };
@@ -24,10 +26,11 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const defaultScreenOptions: NativeStackNavigationOptions = {
-  headerStyle: { backgroundColor: '#0f0f1a' },
-  headerTintColor: '#f5c842',
-  headerTitleStyle: { fontWeight: '700' },
-  contentStyle: { backgroundColor: '#0f0f1a' },
+  headerStyle: { backgroundColor: '#F8FAFC' },
+  headerTintColor: '#0F172A',
+  headerTitleStyle: { fontWeight: '600' },
+  headerShadowVisible: false,
+  contentStyle: { backgroundColor: '#F8FAFC' },
   animation: 'slide_from_right',
 };
 
@@ -51,12 +54,14 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="ConnectAccounts"
+          component={ConnectAccountsScreen}
+          options={{ title: '', headerBackTitle: 'Back' }}
+        />
+        <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#F8FAFC' },
-          }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Record"
