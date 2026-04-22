@@ -41,32 +41,32 @@ export type TaskInput = Omit<TaskRow, 'id' | 'created_at'>;
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-let _client: SupabaseClient | null = null;
+const AUTH_OPTIONS = {
+  persistSession: true,
+  autoRefreshToken: true,
+  detectSessionInUrl: false, // must be false for React Native
+  storage: AsyncStorage,     // use AsyncStorage so sessions survive app restarts
+};
+
+// Initialise eagerly when env vars are present so the client is ready the
+// moment any other module imports this service — no useEffect timing needed.
+let _client: SupabaseClient | null =
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: AUTH_OPTIONS })
+    : null;
 
 /**
- * Initialises the Supabase client once and returns it.
- * Call this early in your app (e.g. inside App.tsx before rendering).
+ * Validates that credentials were available at bundle time.
+ * Call this in App.tsx so users see a clear error screen when the .env is
+ * missing, rather than a cryptic crash when the first DB call fires.
  */
 export function initSupabase(): SupabaseClient {
   if (_client) return _client;
 
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
-      'Supabase credentials missing. Set EXPO_PUBLIC_SUPABASE_URL and ' +
-        'EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.',
-    );
-  }
-
-  _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false, // must be false for React Native
-      storage: AsyncStorage,     // use AsyncStorage so sessions survive app restarts
-    },
-  });
-
-  return _client;
+  throw new Error(
+    'Supabase credentials missing. Set EXPO_PUBLIC_SUPABASE_URL and ' +
+      'EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.',
+  );
 }
 
 /** Returns the initialised client, throwing if initSupabase() was never called. */
@@ -113,7 +113,41 @@ export async function signOut(): Promise<void> {
 
 export async function getCurrentUser(): Promise<User | null> {
   const { data, error } = await getClient().auth.getUser();
+  if (error) {
+    // No session exists yet — not a real error, just means the user is not signed in.
+    if (error.message === 'Auth session missing!') return null;
+    throw error;
+  }
+  return data.user;
+}
+
+/**
+ * Returns the current user, creating a silent anonymous session first if
+ * none exists. This lets the app save data without requiring sign-up.
+ * When the user later registers, call `linkEmailToAnonymousUser` to
+ * convert the anonymous account into a permanent one.
+ */
+export async function getOrCreateAnonymousUser(): Promise<User> {
+  const existing = await getCurrentUser();
+  if (existing) return existing;
+
+  const { data, error } = await getClient().auth.signInAnonymously();
   if (error) throw error;
+  if (!data.user) throw new Error('Anonymous sign-in returned no user.');
+  return data.user;
+}
+
+/**
+ * Converts an anonymous session into a permanent account by attaching an
+ * email + password. The user keeps all data they created anonymously.
+ */
+export async function linkEmailToAnonymousUser(
+  email: string,
+  password: string,
+): Promise<User> {
+  const { data, error } = await getClient().auth.updateUser({ email, password });
+  if (error) throw error;
+  if (!data.user) throw new Error('Account linking returned no user.');
   return data.user;
 }
 

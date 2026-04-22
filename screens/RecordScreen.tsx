@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { getOrCreateAnonymousUser, createTask as createTaskInDB } from '../services/supabaseService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,8 +94,27 @@ export default function RecordScreen({ navigation }: Props) {
     }
   }
 
-  function handleSave() {
-    // TODO: pass transcribedText to aiService for parsing + scoring
+  async function handleSave() {
+    const title = transcribedText.trim();
+    if (!title) return;
+    console.log('[RecordScreen] handleSave — transcript:', title);
+
+    try {
+      const user = await getOrCreateAnonymousUser();
+      const row = await createTaskInDB({
+        user_id: user.id,
+        title,
+        category: 'personal',
+        deadline: null,
+        priority_score: 0,
+        is_completed: false,
+        notes: null,
+      });
+      console.log('[RecordScreen] ✅ Task saved to Supabase — id:', row.id);
+    } catch (e) {
+      console.error('[RecordScreen] ❌ Supabase save failed:', e);
+    }
+
     navigation.navigate('Home');
   }
 

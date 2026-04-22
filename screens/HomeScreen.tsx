@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { getOrCreateAnonymousUser, createTask as createTaskInDB } from '../services/supabaseService';
+import { TaskCategory } from '../models';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -339,18 +341,42 @@ export default function HomeScreen({ navigation: _navigation }: Props) {
     );
   }
 
-  function addTypedTask(title: string) {
+  async function addTypedTask(title: string, category: TaskCategory = 'personal') {
+    console.log('[HomeScreen] addTypedTask — title:', title);
+
+    // Optimistic update: add to UI immediately so it feels instant
+    const localId = generateId();
     setTasks((prev) => [
       ...prev,
       {
-        id: generateId(),
+        id: localId,
         title,
-        category: 'personal',
+        category,
         priorityScore: 0,
         isCompleted: false,
         createdAt: new Date(),
       },
     ]);
+
+    try {
+      const user = await getOrCreateAnonymousUser();
+      const row = await createTaskInDB({
+        user_id: user.id,
+        title,
+        category,
+        deadline: null,
+        priority_score: 0,
+        is_completed: false,
+        notes: null,
+      });
+      console.log('[HomeScreen] ✅ Task saved to Supabase — id:', row.id);
+      // Swap the temporary local id for the real Supabase uuid
+      setTasks((prev) =>
+        prev.map((t) => (t.id === localId ? { ...t, id: row.id } : t))
+      );
+    } catch (e) {
+      console.error('[HomeScreen] ❌ Supabase save failed:', e);
+    }
   }
 
   // ── Voice-capture handlers ──
@@ -378,7 +404,8 @@ export default function HomeScreen({ navigation: _navigation }: Props) {
 
   function saveRecording() {
     if (!transcribedText.trim()) return;
-    addTypedTask(transcribedText.trim());
+    console.log('[HomeScreen] saveRecording — transcript:', transcribedText.trim());
+    void addTypedTask(transcribedText.trim());
     setTranscribedText('');
     setRecordState('idle');
   }
