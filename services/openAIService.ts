@@ -1,12 +1,16 @@
 import { TaskCategory } from '../models';
 import { TaskRow } from './supabaseService';
+import { getClient } from './supabaseService';
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
+//
+// Chat completions are proxied through the "openai-chat" Supabase Edge Function,
+// which holds the OpenAI API key as a server-side secret. The client never
+// sees the key and is only authorised to call OpenAI via its Supabase JWT.
 
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
-const CHAT_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const EDGE_FUNCTION_NAME = 'openai-chat';
 const MODEL = 'gpt-4o';
 const TEMPERATURE = 0.2; // low temperature → consistent, deterministic output
 
@@ -27,10 +31,15 @@ export interface PriorityScore {
   reason: string; // one-sentence explanation for the score
 }
 
-// Internal shape of a GPT-4o message.
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+// Shape returned by OpenAI (forwarded verbatim by the edge function).
+interface OpenAIChatResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  error?: { message: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -38,39 +47,31 @@ interface ChatMessage {
 // ---------------------------------------------------------------------------
 
 /**
- * Sends a chat completion request to GPT-4o and returns the raw response
- * text from the first choice. Always requests JSON output.
- * Throws a descriptive error on non-2xx responses or malformed replies.
+ * Invokes the openai-chat edge function and returns the response content
+ * from the first choice. Always requests JSON-formatted output.
  */
 async function callGPT(messages: ChatMessage[]): Promise<string> {
-  if (!OPENAI_API_KEY) {
-    throw new Error(
-      'OpenAI API key missing. Set EXPO_PUBLIC_OPENAI_API_KEY in your .env file.',
-    );
-  }
-
-  const response = await fetch(CHAT_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+  const { data, error } = await getClient().functions.invoke<OpenAIChatResponse>(
+    EDGE_FUNCTION_NAME,
+    {
+      body: {
+        model: MODEL,
+        temperature: TEMPERATURE,
+        response_format: { type: 'json_object' },
+        messages,
+      },
     },
-    body: JSON.stringify({
-      model: MODEL,
-      temperature: TEMPERATURE,
-      response_format: { type: 'json_object' }, // guarantees parseable JSON output
-      messages,
-    }),
-  });
+  );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+  if (error) {
+    throw new Error(`Edge function error: ${error.message}`);
   }
 
-  const json = await response.json();
-  const content: string | undefined = json.choices?.[0]?.message?.content;
+  if (data?.error) {
+    throw new Error(`OpenAI API error: ${data.error.message}`);
+  }
 
+  const content = data?.choices?.[0]?.message?.content;
   if (!content) {
     throw new Error('OpenAI returned an empty response.');
   }
@@ -78,9 +79,6 @@ async function callGPT(messages: ChatMessage[]): Promise<string> {
   return content;
 }
 
-/**
- * Parses a JSON string returned by GPT and throws a clear error if it fails.
- */
 function parseJSON<T>(raw: string, context: string): T {
   try {
     return JSON.parse(raw) as T;
@@ -155,7 +153,7 @@ Every task in the input must appear in the output. Do not add or remove tasks.
  * // → { title: "File taxes", category: "legal", deadline: "2025-04-25", notes: null }
  */
 export async function parseVoiceTranscript(rawTranscript: string): Promise<ParsedTask> {
-  const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+  const today = new Date().toISOString().split('T')[0];
 
   const messages: ChatMessage[] = [
     { role: 'system', content: PARSE_TASK_SYSTEM_PROMPT },
@@ -173,7 +171,7 @@ export async function parseVoiceTranscript(rawTranscript: string): Promise<Parse
     'work', 'personal', 'health', 'social', 'relationship', 'legal', 'routine',
   ];
   if (!validCategories.includes(parsed.category)) {
-    parsed.category = 'personal'; // safe fallback
+    parsed.category = 'personal';
   }
 
   return parsed;
@@ -198,8 +196,6 @@ export async function prioritizeTasks(
 ): Promise<PriorityScore[]> {
   if (tasks.length === 0) return [];
 
-  // Serialise tasks into a compact, readable format for the model.
-  // TaskRow uses snake_case and stores deadline as an ISO string already.
   const taskList = tasks.map((t) => ({
     id: t.id,
     title: t.title,
